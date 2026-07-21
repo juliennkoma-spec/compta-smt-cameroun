@@ -173,21 +173,40 @@ def main():
                 st.download_button("📥 Télécharger Excel SMT", output.getvalue(), "compta_ohada_cameroun.xlsx")
 
         # 5. GESTION ADMIN
-        elif choice == "Gestion Admin" and st.session_state.role == 'admin':
-            st.header("⚙️ Administration des comptes")
-            new_u = st.text_input("Nom d'utilisateur client")
-            new_p = st.text_input("Mot de passe", type="password")
-            if st.button("Créer le compte"):
+elif choice == "Gestion Admin" and st.session_state.role == 'admin':
+    st.header("⚙️ Administration des comptes")
+    
+    col_create, col_list = st.columns(2)
+    
+    with col_create:
+        st.subheader("Créer un nouvel utilisateur")
+        new_u = st.text_input("Nom d'utilisateur client")
+        new_p = st.text_input("Mot de passe", type="password")
+        if st.button("Créer le compte"):
+            if new_u and new_p:
                 try:
                     conn = get_connection()
-                    conn.execute("INSERT INTO users (username, password, role) VALUES (?,?,?)", (new_u, make_hashes(new_p), 'user'))
+                    conn.execute("INSERT INTO users (username, password, role) VALUES (?,?,?)", 
+                                 (new_u, make_hashes(new_p), 'user'))
                     conn.commit()
-                    st.success(f"Compte {new_u} créé !")
-                except: st.error("Le nom d'utilisateur existe déjà.")
+                    st.success(f"Compte '{new_u}' créé avec succès !")
+                except sqlite3.IntegrityError:
+                    st.error("Le nom d'utilisateur existe déjà.")
+            else:
+                st.warning("Veuillez remplir tous les champs.")
 
-        if st.sidebar.button("Déconnexion"):
-            st.session_state.logged_in = False
-            st.rerun()
-
-if __name__ == '__main__':
-    main()
+    with col_list:
+        st.subheader("Utilisateurs existants")
+        conn = get_connection()
+        df_users = pd.read_sql("SELECT id, username, role FROM users", conn)
+        st.dataframe(df_users, use_container_width=True)
+        
+        user_to_del = st.number_input("ID de l'utilisateur à supprimer", min_value=1, step=1)
+        if st.button("Supprimer l'utilisateur"):
+            if user_to_del == st.session_state.user_id:
+                st.error("Vous ne pouvez pas supprimer votre propre compte admin actuel !")
+            else:
+                conn.execute(f"DELETE FROM users WHERE id={user_to_del}")
+                conn.commit()
+                st.success("Utilisateur supprimé.")
+                st.rerun()
